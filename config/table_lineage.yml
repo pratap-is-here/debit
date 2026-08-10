@@ -1,0 +1,13 @@
+# table_lineage.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Downstream-only dependency graph. Each entry lists the DIRECT downstream
+# tables that consume it. Upstream is computed by inverting this graph at
+# runtime. Must be a valid DAG (no cycles). Every subset table needs an entry,
+# even if `downstream:` is an empty list.
+
+lineage:
+  <schema.source_table>:
+    downstream:
+      - <schema.downstream_table>
+  <schema.downstream_table>:
+    downstream: []

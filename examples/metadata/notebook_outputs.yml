@@ -1,0 +1,27 @@
+# Example notebook_outputs.yml — maps each notebook folder to the tables it
+# produces. Used by detect_impact.py to translate a changed notebook into the
+# set of impacted tables. logical_id values are synthetic placeholders.
+
+notebook_outputs:
+  load_dim_customer.Notebook:
+    display_name: load_dim_customer
+    logical_id: 00000000-0000-0000-0000-000000000001
+    tables:
+      - silver.dim_customer
+  load_dim_product.Notebook:
+    display_name: load_dim_product
+    logical_id: 00000000-0000-0000-0000-000000000002
+    tables:
+      - silver.dim_product
+  build_fact_orders.Notebook:
+    display_name: build_fact_orders
+    logical_id: 00000000-0000-0000-0000-000000000003
+    tables:
+      - silver.fact_orders
+  build_sales_summaries.Notebook:
+    display_name: build_sales_summaries
+    logical_id: 00000000-0000-0000-0000-000000000004
+    tables:
+      - gold.daily_sales_summary
+      - gold.product_revenue_summary
+      - Files/exports/sales/daily_sales_csv

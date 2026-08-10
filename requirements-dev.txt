@@ -1,0 +1,8 @@
+# Development / CI dependencies for running the test suite.
+# These are in addition to requirements.txt.
+
+pytest>=7.0
+PyYAML>=6.0
+jsonschema>=4.0
+requests>=2.31.0
+azure-identity>=1.15.0

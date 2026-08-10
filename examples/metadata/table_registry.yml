@@ -1,0 +1,93 @@
+# Example table_registry.yml — per-table data-quality contracts.
+# This is fully synthetic. Tune min_rows, freshness_hours, freshness_column,
+# required_columns, and custom checks to match your own tables.
+
+tables:
+  silver.dim_customer:
+    execution_freshness_hours: 48
+    min_rows: 100
+    freshness_hours: 48
+    freshness_column: updated_at
+    schema:
+      required_columns:
+        - customer_id
+        - customer_name
+        - region
+        - updated_at
+    not_null_columns:
+      - customer_id
+
+  silver.dim_product:
+    execution_freshness_hours: 48
+    min_rows: 50
+    freshness_hours: 48
+    freshness_column: updated_at
+    schema:
+      required_columns:
+        - product_id
+        - product_name
+        - category
+        - unit_price
+        - updated_at
+    not_null_columns:
+      - product_id
+
+  silver.fact_orders:
+    execution_freshness_hours: 24
+    min_rows: 1000
+    freshness_hours: 24
+    freshness_column: order_date
+    min_rows_date_check: -1
+    schema:
+      required_columns:
+        - order_id
+        - customer_id
+        - product_id
+        - quantity
+        - order_amount
+        - order_date
+    not_null_columns:
+      - order_id
+      - customer_id
+      - product_id
+    checks:
+      - name: order_amount_non_negative
+        sql: "SELECT COUNT(1) FROM {table} WHERE order_amount IS NOT NULL AND order_amount < 0"
+        expect_eq: 0
+
+  gold.daily_sales_summary:
+    execution_freshness_hours: 24
+    min_rows: 30
+    freshness_hours: 24
+    freshness_column: sales_date
+    schema:
+      required_columns:
+        - sales_date
+        - region
+        - total_orders
+        - total_revenue
+
+  gold.product_revenue_summary:
+    execution_freshness_hours: 24
+    min_rows: 50
+    freshness_hours: 24
+    freshness_column: sales_date
+    schema:
+      required_columns:
+        - product_id
+        - category
+        - sales_date
+        - revenue
+
+  Files/exports/sales/daily_sales_csv:
+    execution_freshness_hours: 24
+    min_rows: 30
+    freshness_hours: 24
+    freshness_column: sales_date
+    min_rows_date_check: -1
+    schema:
+      required_columns:
+        - sales_date
+        - region
+        - total_orders
+        - total_revenue

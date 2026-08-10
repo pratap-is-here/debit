@@ -1,0 +1,25 @@
+# Example table_lineage.yml — downstream-only dependency graph.
+# Each entry lists the DIRECT downstream tables that consume this table.
+# Upstream relationships are computed at runtime by graph inversion.
+# Must be a valid DAG (no cycles). Every subset table needs an entry, even if
+# its downstream list is empty.
+
+lineage:
+  silver.dim_customer:
+    downstream:
+      - silver.fact_orders
+  silver.dim_product:
+    downstream:
+      - silver.fact_orders
+      - gold.product_revenue_summary
+  silver.fact_orders:
+    downstream:
+      - gold.daily_sales_summary
+      - gold.product_revenue_summary
+  gold.daily_sales_summary:
+    downstream:
+      - Files/exports/sales/daily_sales_csv
+  gold.product_revenue_summary:
+    downstream: []
+  Files/exports/sales/daily_sales_csv:
+    downstream: []
