@@ -1,0 +1,12 @@
+# notebook_outputs.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Maps each notebook source folder to the tables it produces. Used by
+# detect_impact.py to translate a changed notebook into impacted tables.
+# This file can be auto-generated with src/generate_lineage.py.
+
+notebook_outputs:
+  <your_notebook.Notebook>:
+    display_name: <your_notebook>
+    logical_id: <optional-fabric-logical-id>
+    tables:
+      - <schema.table_name>

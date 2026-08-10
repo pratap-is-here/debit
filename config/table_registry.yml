@@ -1,0 +1,31 @@
+# table_registry.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Per-table data-quality contracts. Copy to your metadata directory and edit.
+#
+# Supported per-table fields (all optional unless noted):
+#   min_rows                  Minimum acceptable row count (0 disables the check).
+#   freshness_hours           Max age of newest row via freshness_column (0 disables).
+#   freshness_column          Column used for data-content freshness.
+#   execution_freshness_hours Max age since the producing job last ran successfully.
+#   min_rows_date_check       Business-day offset for the row-count date filter
+#                             (e.g. -1 = yesterday). Omit to use the latest date.
+#   row_count_mode            "business_offset" | "latest_available_date" | "total".
+#   schema.required_columns   Columns that must be present.
+#   not_null_columns          Columns that must contain no NULLs.
+#   checks                    Custom SQL assertions (see example below).
+
+tables:
+  <schema.table_name>:
+    min_rows: <int>
+    freshness_hours: <int>
+    freshness_column: <column_name>
+    execution_freshness_hours: <int>
+    schema:
+      required_columns:
+        - <column_name>
+    not_null_columns:
+      - <column_name>
+    checks:
+      - name: <unique_check_name>
+        sql: "SELECT COUNT(1) FROM {table} WHERE <condition>"
+        expect_eq: 0

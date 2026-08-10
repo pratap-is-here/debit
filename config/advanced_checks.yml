@@ -1,0 +1,25 @@
+# advanced_checks.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Registry of "advanced check" notebooks that perform complex, multi-table or
+# statistical validations beyond inline SQL checks. Checks run sequentially in
+# listed order.
+#
+# Fields:
+#   name          Unique identifier for the check.
+#   notebook_name Fabric notebook display name (looked up in the workspace).
+#   notebook_id   Fabric notebook item ID fallback.
+#   description   Human-readable purpose.
+#   tables        Tables the check reads (used for scope filtering).
+#   timeout_sec   Per-check job timeout override (optional).
+#   enabled       Toggle the check on/off without removing it.
+
+advanced_checks:
+  - name: <unique_check_name>
+    notebook_name: "<your_check_notebook>"
+    notebook_id: "<your-fabric-notebook-id>"
+    description: >
+      <what this check validates>
+    tables:
+      - <schema.table_name>
+    timeout_sec: 600
+    enabled: true

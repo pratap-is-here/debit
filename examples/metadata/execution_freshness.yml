@@ -1,0 +1,18 @@
+# Example execution_freshness.yml — configures the execution-freshness gate.
+# The gate compares each table's last successful producing-job run time against
+# its upstream dependencies to catch stale data introduced by a PR.
+
+freshness_gating:
+  enabled: true
+  mode: soft            # soft = warn, hard = block, skip = disabled
+
+  # Clock-skew tolerance for upstream-vs-downstream timestamp comparison (minutes).
+  tolerance_minutes: 30
+
+  # Org-wide fallback for how recently a table's producing job must have run.
+  # Overridden per table by `execution_freshness_hours` in table_registry.yml.
+  default_max_age_hours: 48
+
+  # Tables exempt from freshness gating (e.g., manually maintained dimensions).
+  exempt_tables:
+    - silver.dim_product
