@@ -1,0 +1,15 @@
+# Example pipeline_outputs.yml — maps each pipeline folder to the tables it
+# orchestrates/produces. Used by detect_impact.py. logical_id values are
+# synthetic placeholders.
+
+pipeline_outputs:
+  sales_daily_load.DataPipeline:
+    display_name: sales_daily_load
+    logical_id: 00000000-0000-0000-0000-0000000000a1
+    tables:
+      - silver.dim_customer
+      - silver.dim_product
+      - silver.fact_orders
+      - gold.daily_sales_summary
+      - gold.product_revenue_summary
+      - Files/exports/sales/daily_sales_csv

@@ -1,0 +1,103 @@
+# =============================================================================
+# TEMPLATE — PR validation gate for Azure DevOps (generic; no 1ES / no feed)
+# =============================================================================
+# COPY-AND-ADAPT template. This mirrors the reference production pipeline but
+# uses only public building blocks (public PyPI, a hosted pool, and your own
+# service connection) so any team can run it. To use it:
+#   1. Add this pipeline in Azure DevOps.
+#   2. Set it as a Build Validation branch policy on your integration branch
+#      (see ../docs/operations-and-access.md — this is what makes it required).
+#   3. Set the variables below (metadata_path and, for Phase 2, the service
+#      connection + FABRIC_* IDs).
+#
+# Phase 1 (metadata + impact) is OFFLINE. Phase 2 (Fabric data-presence) runs
+# only when `azure_service_connection` is set.
+# =============================================================================
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main                      # adapt to your integration branch
+  # paths:                        # optional: limit to your data-platform folders
+  #   include:
+  #     - notebooks/*
+  #     - pipelines/*
+  #     - metadata/*
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  metadata_path: examples/metadata          # point at YOUR metadata directory
+  # --- Phase 2 (optional) — set these to enable live data-presence checks ---
+  azure_service_connection: ''              # ADO service connection (WIF) name
+  fabric_workspace_id: ''
+  fabric_lakehouse_workspace_id: ''
+  fabric_lakehouse_id: ''
+  data_presence_notebook_id: ''
+  data_presence_mode: soft
+
+steps:
+- checkout: self
+  fetchDepth: 0
+  displayName: Checkout (full history for diff)
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.11'
+  displayName: Use Python 3.11
+
+- script: pip install -r requirements.txt
+  displayName: Install dependencies
+
+- powershell: |
+    $prId = "$(System.PullRequest.PullRequestId)"
+    $outFile = "$(Build.SourcesDirectory)/pr_description.txt"
+    if (-not $prId -or $prId -notmatch '^\d+$') {
+      Set-Content -Path $outFile -Value "" -NoNewline; exit 0
+    }
+    $url = "$(System.CollectionUri)$(System.TeamProject)/_apis/git/repositories/$(Build.Repository.ID)/pullrequests/$prId?api-version=7.0"
+    $headers = @{ Authorization = "Bearer $(System.AccessToken)" }
+    $resp = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+    Set-Content -Path $outFile -Value ([string]$resp.description) -NoNewline
+  displayName: Fetch PR description (Azure DevOps REST)
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- powershell: |
+    # $(System.PullRequest.TargetBranch) includes the refs/heads/ prefix.
+    $target = "$(System.PullRequest.TargetBranch)" -replace '^refs/heads/', ''
+    python src/detect_impact.py --metadata_path "$(metadata_path)" --target_branch "origin/$target"
+    # detect_impact sets the pipeline variable auto_detected_tables natively.
+  displayName: Detect impacted tables
+
+- powershell: |
+    python src/validate_pr.py `
+      --metadata_path "$(metadata_path)" `
+      --pr_description_file "$(Build.SourcesDirectory)/pr_description.txt" `
+      --additional_tables "$(auto_detected_tables)"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "##vso[task.logissue type=error]PR validation failed."
+      exit 1
+    }
+  displayName: Validate PR metadata (Phase 1 gate)
+
+- task: AzureCLI@2
+  displayName: Data presence (Phase 2 — optional, soft)
+  condition: and(succeeded(), ne(variables['azure_service_connection'], ''))
+  inputs:
+    azureSubscription: $(azure_service_connection)
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      # trigger_data_presence uses AzureCliCredential, which picks up the
+      # session established by the AzureCLI@2 task.
+      python src/trigger_data_presence.py \
+        --metadata_path "$(metadata_path)" \
+        --workspace_id "$(fabric_workspace_id)" \
+        --lakehouse_workspace_id "$(fabric_lakehouse_workspace_id)" \
+        --lakehouse_id "$(fabric_lakehouse_id)" \
+        --notebook_item_id "$(data_presence_notebook_id)" \
+        --pr_description_file "$(Build.SourcesDirectory)/pr_description.txt" \
+        --mode "$(data_presence_mode)"

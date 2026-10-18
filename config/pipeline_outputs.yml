@@ -1,0 +1,11 @@
+# pipeline_outputs.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Maps each pipeline source folder to the tables it orchestrates/produces.
+# Used by detect_impact.py. Can be auto-generated with src/generate_lineage.py.
+
+pipeline_outputs:
+  <your_pipeline.DataPipeline>:
+    display_name: <your_pipeline>
+    logical_id: <optional-fabric-logical-id>
+    tables:
+      - <schema.table_name>

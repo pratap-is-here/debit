@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a problem with the framework
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps (and metadata, if relevant) to reproduce the issue.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Release version or commit SHA.
+    validations:
+      required: false
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+    validations:
+      required: false

@@ -1,0 +1,118 @@
+# =============================================================================
+# TEMPLATE — PR validation gate for GitHub Actions
+# =============================================================================
+# This is a COPY-AND-ADAPT template, NOT an active workflow (it lives under
+# pipeline-templates/, so GitHub does not run it from here). To use it:
+#   1. Copy this file to .github/workflows/pr-validation.yml in your repo.
+#   2. Set METADATA_PATH to your own metadata directory
+#      (see ../docs/configuration-reference.md).
+#   3. Adjust the trigger branch/paths to match your integration branch.
+#   4. (Optional) Enable Phase 2 — see the phase2-data-presence job and
+#      ../docs/operations-and-access.md for the Entra app + Fabric access setup.
+#
+# Phase 1 (metadata + impact detection) is fully OFFLINE — no cloud creds.
+# Phase 2 (live data-presence in Fabric) is OFF by default.
+# =============================================================================
+name: PR Validation (template)
+
+on:
+  pull_request:
+    branches: [ main ]            # adapt to your integration branch
+    # paths:                      # optional: limit to your data-platform folders
+    #   - "notebooks/**"
+    #   - "pipelines/**"
+    #   - "metadata/**"
+
+permissions:
+  contents: read
+
+env:
+  # Point this at YOUR metadata directory. `examples/metadata` is the bundled
+  # synthetic dataset, here only so the template runs out of the box.
+  METADATA_PATH: examples/metadata
+
+jobs:
+  phase1-metadata:
+    name: Phase 1 — metadata + impact (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so the git diff can resolve the base
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Detect impacted tables from the diff
+        id: detect
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          python src/detect_impact.py \
+            --metadata_path "${METADATA_PATH}" \
+            --target_branch "origin/${{ github.base_ref }}" | tee detect_impact.log
+          # detect_impact prints an Azure DevOps '##vso[...]' line; on GitHub
+          # Actions we parse the table list from it and expose it as a step output.
+          AUTO="$(sed -n 's/.*auto_detected_tables\]//p' detect_impact.log | tail -n1)"
+          echo "tables=${AUTO}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate PR metadata (Phase 1 gate)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "${PR_BODY}" > pr_description.txt
+          python src/validate_pr.py \
+            --metadata_path "${METADATA_PATH}" \
+            --pr_description_file pr_description.txt \
+            --additional_tables "${{ steps.detect.outputs.tables }}"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: Phase 2 — live data-presence checks against Microsoft Fabric.
+  # Disabled by default. To enable:
+  #   * set repository variable ENABLE_PHASE2 = true
+  #   * configure OIDC (azure/login) + the FABRIC_* variables/secrets below
+  #   * see ../docs/operations-and-access.md for the Entra app + Fabric access
+  # ---------------------------------------------------------------------------
+  phase2-data-presence:
+    name: Phase 2 — data presence (Fabric, optional)
+    needs: phase1-metadata
+    if: ${{ vars.ENABLE_PHASE2 == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write             # required for OIDC azure/login
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run data-presence validation (soft mode)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "${PR_BODY}" > pr_description.txt
+          # trigger_data_presence uses AzureCliCredential, which picks up the
+          # session established by azure/login above.
+          python src/trigger_data_presence.py \
+            --metadata_path "${METADATA_PATH}" \
+            --workspace_id "${{ vars.FABRIC_WORKSPACE_ID }}" \
+            --lakehouse_workspace_id "${{ vars.FABRIC_LAKEHOUSE_WORKSPACE_ID }}" \
+            --lakehouse_id "${{ vars.FABRIC_LAKEHOUSE_ID }}" \
+            --notebook_item_id "${{ vars.DATA_PRESENCE_NOTEBOOK_ITEM_ID }}" \
+            --pr_description_file pr_description.txt \
+            --mode soft

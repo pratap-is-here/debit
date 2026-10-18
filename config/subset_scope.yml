@@ -1,0 +1,25 @@
+# subset_scope.yml (TEMPLATE)
+# ----------------------------------------------------------------------------
+# Defines what is in scope for PR validation. Copy this file to your own
+# metadata directory and fill in the placeholders.
+#
+# Rules:
+#   * Every table under `tables:` MUST also be defined in table_registry.yml
+#     and have an entry in table_lineage.yml.
+#   * `notebooks:` / `pipelines:` are source-control folder paths, used to map a
+#     git diff to the impacted tables (see detect_impact.py).
+
+subset:
+  # Main switch. When false, validation is a no-op (always passes).
+  enabled: true
+
+  tables:
+    - <schema.table_name>
+    # - <schema.another_table>
+    # - Files/<path/to/file_output>
+
+  notebooks:
+    - <path/to/your_notebook.Notebook>
+
+  pipelines:
+    - <path/to/your_pipeline.DataPipeline>

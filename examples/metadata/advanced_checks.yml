@@ -1,0 +1,25 @@
+# Example advanced_checks.yml — registry of advanced check notebooks that run
+# complex, multi-table or statistical validations beyond inline SQL checks.
+#
+# Fields:
+#   name          - unique identifier for the check
+#   notebook_name - Fabric notebook display name (looked up in the workspace)
+#   notebook_id   - Fabric notebook item ID fallback (placeholder below)
+#   description   - human-readable purpose
+#   tables        - tables the check reads (used for scope filtering)
+#   timeout_sec   - per-check job timeout override (optional)
+#   enabled       - toggle the check on/off without removing it
+
+advanced_checks:
+  - name: revenue_reconciliation
+    notebook_name: "check_revenue_reconciliation"
+    notebook_id: "<your-fabric-notebook-id>"
+    description: >
+      Reconciles gold.daily_sales_summary total revenue against the sum of
+      silver.fact_orders order_amount for the same date, allowing a small
+      rounding tolerance.
+    tables:
+      - silver.fact_orders
+      - gold.daily_sales_summary
+    timeout_sec: 600
+    enabled: true

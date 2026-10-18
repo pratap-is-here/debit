@@ -1,0 +1,28 @@
+# Example subset_scope.yml — defines which tables, notebooks, and pipelines are
+# in scope for PR validation. This is a fully synthetic "retail sales" dataset
+# used by the test suite and as a runnable example. Replace with your own.
+
+subset:
+  enabled: true
+
+  # Tables governed by the framework. Every table listed here MUST also appear
+  # in table_registry.yml and have an entry in table_lineage.yml.
+  tables:
+    - silver.dim_customer
+    - silver.dim_product
+    - silver.fact_orders
+    - gold.daily_sales_summary
+    - gold.product_revenue_summary
+    - Files/exports/sales/daily_sales_csv
+
+  # Source-control folders for the notebooks that produce the tables above.
+  # Used by detect_impact.py to map a git diff to impacted tables.
+  notebooks:
+    - notebooks/load_dim_customer.Notebook
+    - notebooks/load_dim_product.Notebook
+    - notebooks/build_fact_orders.Notebook
+    - notebooks/build_sales_summaries.Notebook
+
+  # Source-control folders for the data pipelines that orchestrate the loads.
+  pipelines:
+    - pipelines/sales_daily_load.DataPipeline
