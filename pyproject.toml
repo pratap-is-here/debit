@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
-    "PyYAML>=6.0",
+    "PyYAML>=6.0.3",
     "azure-identity>=1.15.0",
     "requests>=2.31.0",
     "jsonschema>=4.0",
