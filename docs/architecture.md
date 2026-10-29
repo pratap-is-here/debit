@@ -2,7 +2,7 @@
 
 ## Overview
 
-Piccolo validates data-platform pull requests against
+DEBIT validates data-platform pull requests against
 declarative, metadata-driven contracts before they merge.
 
 ## Modules (`src/`)

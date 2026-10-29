@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "piccolo"
+name = "debit"
 version = "0.1.0"
 description = "Lineage-aware, metadata-driven validation gates for data pipeline changes."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "Piccolo contributors" }]
+authors = [{ name = "DEBIT contributors" }]
 keywords = ["data-quality", "pull-request", "validation", "fabric", "lineage", "ci"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -29,8 +29,8 @@ dependencies = [
 dev = ["pytest>=7.0"]
 
 [project.urls]
-Homepage = "https://github.com/pratap-is-here/piccolo"
-Issues = "https://github.com/pratap-is-here/piccolo/issues"
+Homepage = "https://github.com/pratap-is-here/debit"
+Issues = "https://github.com/pratap-is-here/debit/issues"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

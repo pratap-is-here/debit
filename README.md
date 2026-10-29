@@ -1,4 +1,4 @@
-# Piccolo
+# DEBIT — Data Engineering Build Impact Testing
 
 A lightweight, metadata-driven framework for validating data-platform pull
 requests **before** they merge. It catches data-quality regressions early by

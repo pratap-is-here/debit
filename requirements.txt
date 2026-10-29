@@ -1,4 +1,4 @@
-# Runtime dependencies for Piccolo.
+# Runtime dependencies for DEBIT.
 # Keep minimal — only what the core framework strictly needs.
 
 PyYAML>=6.0

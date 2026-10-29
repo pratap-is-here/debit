@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to Piccolo.
+Thank you for your interest in contributing to DEBIT (Data Engineering Build Impact Testing).
 
 ## Contribution guidelines
 

@@ -152,7 +152,7 @@ Copy the matching template from
 ### 5.1 Create the Entra app / service principal (Azure CLI)
 ```bash
 # Creates an app + service principal and prints appId (client id) and tenant.
-az ad sp create-for-rbac --name "piccolo-pr-validator" --skip-assignment
+az ad sp create-for-rbac --name "debit-pr-validator" --skip-assignment
 # Note the "appId" (AZURE_CLIENT_ID) and "tenant" (AZURE_TENANT_ID) from the output.
 ```
 
