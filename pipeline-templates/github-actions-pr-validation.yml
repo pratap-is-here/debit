@@ -12,6 +12,13 @@
 #
 # Phase 1 (metadata + impact detection) is fully OFFLINE — no cloud creds.
 # Phase 2 (live data-presence in Fabric) is OFF by default.
+#
+# SECURITY MODEL: a pull_request run checks out the PR's merge commit, so every
+# file in that checkout is PR-authored. Phase 1 holds no credentials, so running
+# PR code there is acceptable. Phase 2 holds a cloud identity, so it runs the
+# validator from the BASE commit (`trusted/`) and treats the PR checkout (`pr/`)
+# only as data. Never run PR-authored code while azure/login is active. See
+# ../docs/operations-and-access.md ("Run trusted code, not PR code").
 # =============================================================================
 name: PR Validation (template)
 
@@ -49,11 +56,13 @@ jobs:
 
       - name: Detect impacted tables from the diff
         id: detect
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
+          git fetch --no-tags origin "${BASE_REF}"
           python src/detect_impact.py \
             --metadata_path "${METADATA_PATH}" \
-            --target_branch "origin/${{ github.base_ref }}" | tee detect_impact.log
+            --target_branch "origin/${BASE_REF}" | tee detect_impact.log
           # detect_impact prints an Azure DevOps '##vso[...]' line; on GitHub
           # Actions we parse the table list from it and expose it as a step output.
           AUTO="$(sed -n 's/.*auto_detected_tables\]//p' detect_impact.log | tail -n1)"
@@ -62,12 +71,14 @@ jobs:
       - name: Validate PR metadata (Phase 1 gate)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          # PR-derived: pass via env, never interpolate ${{ }} into the script body.
+          DETECTED_TABLES: ${{ steps.detect.outputs.tables }}
         run: |
           printf '%s' "${PR_BODY}" > pr_description.txt
           python src/validate_pr.py \
             --metadata_path "${METADATA_PATH}" \
             --pr_description_file pr_description.txt \
-            --additional_tables "${{ steps.detect.outputs.tables }}"
+            --additional_tables "${DETECTED_TABLES}"
 
   # ---------------------------------------------------------------------------
   # OPTIONAL: Phase 2 — live data-presence checks against Microsoft Fabric.
@@ -84,15 +95,34 @@ jobs:
     permissions:
       id-token: write             # required for OIDC azure/login
       contents: read
+    # RECOMMENDED: gate this job behind a protected environment with required
+    # reviewers so a human approves before the cloud identity is used. Note that
+    # using `environment:` changes the OIDC subject claim to
+    # `environment:<name>`, so update the federated credential to match
+    # (see ../docs/operations-and-access.md, section 5.2).
+    # environment: fabric-validation
     steps:
-      - uses: actions/checkout@v4
+      # Trusted validator: the BASE commit, not the PR's merge commit.
+      - name: Checkout trusted validator (base commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+
+      # PR content: treated as DATA only (metadata). Never executed here.
+      - name: Checkout PR (data only)
+        uses: actions/checkout@v4
+        with:
+          path: pr
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies (trusted)
+        run: pip install -r trusted/requirements.txt
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -104,12 +134,14 @@ jobs:
       - name: Run data-presence validation (soft mode)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          # The trusted scripts resolve metadata/notebooks relative to the PR checkout.
+          REPO_ROOT: ${{ github.workspace }}/pr
         run: |
           printf '%s' "${PR_BODY}" > pr_description.txt
           # trigger_data_presence uses AzureCliCredential, which picks up the
           # session established by azure/login above.
-          python src/trigger_data_presence.py \
-            --metadata_path "${METADATA_PATH}" \
+          python trusted/src/trigger_data_presence.py \
+            --metadata_path "pr/${METADATA_PATH}" \
             --workspace_id "${{ vars.FABRIC_WORKSPACE_ID }}" \
             --lakehouse_workspace_id "${{ vars.FABRIC_LAKEHOUSE_WORKSPACE_ID }}" \
             --lakehouse_id "${{ vars.FABRIC_LAKEHOUSE_ID }}" \

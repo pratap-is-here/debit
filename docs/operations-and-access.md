@@ -142,6 +142,40 @@ Copy the matching template from
 3. **Branch protection (the gate).** Add a branch protection rule requiring the
    `PR Validation` workflow's status check before merge.
 
+### 4.C Run trusted code, not PR code
+
+A pull-request build checks out the PR's **merge commit**: the target branch plus
+the PR author's changes. Every file in that checkout, including `src/*.py` and
+`requirements.txt`, is therefore written by the PR author. If a step runs those
+files while a cloud identity is logged in (`AzureCLI@2` or `azure/login`), a PR
+can change the validator to run arbitrary commands as that identity.
+
+The templates avoid this:
+
+| Principle | What the templates do |
+|-----------|-----------------------|
+| **Code that holds credentials comes from the target branch.** | The validator (`src/`, `requirements.txt`) is staged from the target/base commit into a separate folder and run from there. |
+| **PR content is data, not code.** | The PR's `metadata/` is read by the trusted scripts via `--metadata_path` and `REPO_ROOT`; it is never executed. |
+| **PR-derived text is never pasted into a script body.** | The PR description, detected table names and branch names are passed through environment variables (`env:`), not `$(macro)` / `${{ expression }}` expansion, which is a command-injection path. |
+| **Phase 1 holds no credentials.** | The offline phase uses a read-only token, so running PR code there is an accepted risk. Keep it that way. |
+
+Additional hardening to consider:
+
+* **Gate Phase 2 behind approval.** In Azure DevOps, require a team member's
+  comment before PR builds run (Build Validation policy). In GitHub Actions, use a
+  protected `environment` with required reviewers (the federated credential subject
+  then becomes `environment:<name>`).
+* **Least privilege.** Scope the identity to only the workspaces and lakehouse it
+  needs (Section 3), and prefer a dedicated identity for PR validation.
+* **PR runtime overrides.** `ENABLE_PR_RUNTIME_OVERRIDES` lets a PR description
+  retarget the notebook and lakehouse. Workspaces are checked against allowlists, but
+  `lakehouse_id` is not. Set `ENABLE_PR_RUNTIME_OVERRIDES=false` if PR authors are
+  not fully trusted.
+* **The pipeline definition itself.** Depending on the CI system, the workflow or
+  YAML may be taken from the PR. Protect it with branch policies (for example
+  CODEOWNERS or required reviewers on the pipeline file) or run PR builds from a
+  trusted definition.
+
 ---
 
 ## 5. Appendix — copy-and-adapt commands
