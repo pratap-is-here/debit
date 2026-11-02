@@ -12,6 +12,13 @@
 #
 # Phase 1 (metadata + impact) is OFFLINE. Phase 2 (Fabric data-presence) runs
 # only when `azure_service_connection` is set.
+#
+# SECURITY MODEL: a PR build checks out the PR's merge commit, so every file in
+# the checkout is PR-authored. This template therefore runs the validator
+# (`src/` and `requirements.txt`) from a copy staged from the TARGET branch, and
+# treats the PR's metadata only as data. Never run PR-authored code while a
+# service connection is logged in. See ../docs/operations-and-access.md
+# ("Run trusted code, not PR code").
 # =============================================================================
 trigger: none
 
@@ -30,6 +37,10 @@ pool:
 
 variables:
   metadata_path: examples/metadata          # point at YOUR metadata directory
+  # Trusted copy of the validator, staged from the target branch (see steps).
+  trusted_root: $(Agent.TempDirectory)/trusted
+  # Tells the scripts where the PR's metadata/notebooks live (they run from trusted_root).
+  REPO_ROOT: $(Build.SourcesDirectory)
   # --- Phase 2 (optional) — set these to enable live data-presence checks ---
   azure_service_connection: ''              # ADO service connection (WIF) name
   fabric_workspace_id: ''
@@ -43,13 +54,27 @@ steps:
   fetchDepth: 0
   displayName: Checkout (full history for diff)
 
+- bash: |
+    set -euo pipefail
+    target="${TARGET_BRANCH#refs/heads/}"
+    case "$target" in (*[!A-Za-z0-9._/-]*|"") echo "Unexpected target branch name" >&2; exit 1;; esac
+    git rev-parse --verify --quiet "origin/${target}^{commit}" >/dev/null \
+      || { echo "origin/${target} not found in checkout" >&2; exit 1; }
+    rm -rf "${TRUSTED_ROOT}"; mkdir -p "${TRUSTED_ROOT}"
+    git archive "origin/${target}" -- src requirements.txt | tar -x -C "${TRUSTED_ROOT}"
+    echo "Staged validator from origin/${target} into ${TRUSTED_ROOT}"
+  displayName: Stage trusted validator (from target branch)
+  env:
+    TARGET_BRANCH: $(System.PullRequest.TargetBranch)
+    TRUSTED_ROOT: $(trusted_root)
+
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '3.11'
   displayName: Use Python 3.11
 
-- script: pip install -r requirements.txt
-  displayName: Install dependencies
+- script: pip install -r "$(trusted_root)/requirements.txt"
+  displayName: Install dependencies (trusted)
 
 - powershell: |
     $prId = "$(System.PullRequest.PullRequestId)"
@@ -66,22 +91,27 @@ steps:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - powershell: |
-    # $(System.PullRequest.TargetBranch) includes the refs/heads/ prefix.
-    $target = "$(System.PullRequest.TargetBranch)" -replace '^refs/heads/', ''
-    python src/detect_impact.py --metadata_path "$(metadata_path)" --target_branch "origin/$target"
+    # The target branch includes the refs/heads/ prefix.
+    $target = "$env:TARGET_BRANCH" -replace '^refs/heads/', ''
+    python "$(trusted_root)/src/detect_impact.py" --metadata_path "$(metadata_path)" --target_branch "origin/$target"
     # detect_impact sets the pipeline variable auto_detected_tables natively.
   displayName: Detect impacted tables
+  env:
+    TARGET_BRANCH: $(System.PullRequest.TargetBranch)
 
 - powershell: |
-    python src/validate_pr.py `
+    python "$(trusted_root)/src/validate_pr.py" `
       --metadata_path "$(metadata_path)" `
       --pr_description_file "$(Build.SourcesDirectory)/pr_description.txt" `
-      --additional_tables "$(auto_detected_tables)"
+      --additional_tables "$env:AUTO_DETECTED_TABLES"
     if ($LASTEXITCODE -ne 0) {
       Write-Host "##vso[task.logissue type=error]PR validation failed."
       exit 1
     }
   displayName: Validate PR metadata (Phase 1 gate)
+  env:
+    # PR-derived value: pass via env, never macro-expand into the script body.
+    AUTO_DETECTED_TABLES: $(auto_detected_tables)
 
 - task: AzureCLI@2
   displayName: Data presence (Phase 2 — optional, soft)
@@ -93,7 +123,7 @@ steps:
     inlineScript: |
       # trigger_data_presence uses AzureCliCredential, which picks up the
       # session established by the AzureCLI@2 task.
-      python src/trigger_data_presence.py \
+      python "$(trusted_root)/src/trigger_data_presence.py" \
         --metadata_path "$(metadata_path)" \
         --workspace_id "$(fabric_workspace_id)" \
         --lakehouse_workspace_id "$(fabric_lakehouse_workspace_id)" \
