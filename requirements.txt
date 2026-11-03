@@ -4,4 +4,4 @@
 PyYAML>=6.0
 azure-identity>=1.15.0
 requests>=2.31.0
-jsonschema>=4.0
+jsonschema>=4.26.0
